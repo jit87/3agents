@@ -17,7 +17,7 @@ function run(args, env = process.env) {
 }
 
 try {
-  const compiled = run([tsc, "--target", "ES2022", "--module", "commonjs", "--moduleResolution", "node", "--rootDir", ".", "--strict", "--skipLibCheck", "--outDir", output, "lib/workflow-core.ts", "lib/llm.ts"]);
+  const compiled = run([tsc, "--target", "ES2022", "--module", "commonjs", "--moduleResolution", "node", "--rootDir", ".", "--strict", "--skipLibCheck", "--outDir", output, "lib/workflow-core.ts", "lib/llm.ts", "lib/workflow-response.ts"]);
   if (compiled) run(["--test", ...tests], { ...process.env, WORKFLOW_TEST_BUILD_DIR: output });
 } finally {
   await rm(output, { recursive: true, force: true });
