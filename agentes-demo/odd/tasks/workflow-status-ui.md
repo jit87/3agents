@@ -22,7 +22,7 @@ The three-agent workflow is implemented behind `POST /api/requests`, but the pro
 - TDD mode: standard mode (`strict_tdd: false`), previously confirmed by the user for this project.
 - Existing test command: `npm test`; checks include focused ESLint and `npx tsc --noEmit`.
 - Implementation route: delegated direct; the UI, styling, and focused tests form a multi-file change.
-- Delivery strategy: `ask-on-risk`; final authored change is 436 lines (additions plus deletions, including task documentation). Reuse the user's session-level `stacked-to-main` chain strategy selected for the previous work unit.
+- Delivery strategy: `ask-on-risk`; final authored change is 456 lines (additions plus deletions, including task documentation). Reuse the user's session-level `stacked-to-main` chain strategy selected for the previous work unit.
 
 ## Acceptance Criteria
 - [x] User can enter a non-empty request and submit it to the existing POST endpoint; all interface text is in Spanish.
@@ -43,10 +43,10 @@ The three-agent workflow is implemented behind `POST /api/requests`, but the pro
 - `npm test` passed 14/14; `npm run lint` passed; `npx tsc --noEmit` passed. An independent verifier also reran `npm test` successfully. Parent spot-check `npm test` passed 14/14 after sandbox retry.
 - Local page GET smoke check showed the heading, agent sequence, and request form; it did not call Gemini or Neon. No workflow/API logic or endpoint was changed.
 - `npm run build` remains blocked by the pre-existing Next.js configuration combination: `next.config.ts` enables `cacheComponents`, while `app/api/requests/route.ts` declares the Node.js runtime. This task did not change either setting.
-- Final authored diff totals 436 additions plus deletions across source, tests, and this task document. Reuse the user's previously selected `stacked-to-main` chain strategy; no PR or push is requested.
+- Final authored diff totals 456 additions plus deletions across source, tests, and this task document. Reuse the user's previously selected `stacked-to-main` chain strategy; no PR or push is requested.
 - User explicitly authorized the local commit after requesting the Spanish localization; no push or PR is requested.
 - Localized page text, metadata, response fallbacks, and user-facing API validation/failure messages into neutral professional Spanish. The status badge shows both its Spanish label and exact persisted code (`completed`/`failed`).
 - After localization, `npm test` passed 14/14, `npm run lint`, `npx tsc --noEmit`, and `git diff --check` all passed.
 
 ## Next Step
-Implementation, Spanish localization, and checks are complete. Create the local work-unit commit using the user's selected `stacked-to-main` strategy and record its identity here. No push or PR is authorized.
+Implementation, Spanish localization, and checks are complete. Work-unit commit: `4fd488d` (`feat(ui): show final workflow outcomes in Spanish`). No push or PR was created.
