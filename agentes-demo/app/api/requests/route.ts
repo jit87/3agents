@@ -1,7 +1,5 @@
 import { createWorkflow } from "@/lib/workflow";
 
-export const runtime = "nodejs";
-
 export async function POST(request: Request) {
   let body: unknown;
   try {
