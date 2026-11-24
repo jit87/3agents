@@ -23,7 +23,7 @@ The project currently stores workflow-shaped request/task states and attempt lim
 - External provider requests are not part of deterministic unit tests; never read or print `.env.local` or API key values.
 - Use the existing task attempt columns and request status values; no parallel retry counter or workflow state machine in the schema.
 - Implementation route: delegated direct; mandatory because this is a multi-file, non-trivial workflow requiring preparation and tests.
-- Forecast: approximately 540 authored added lines for implementation and test files, plus small package/task-doc edits; advisory estimate, not a cap. Delivery strategy: `ask-on-risk`.
+- Forecast: approximately 540 authored added lines for implementation and test files, plus small package/task-doc edits; the local commit contains 834 insertions across 10 files. Delivery strategy: `ask-on-risk`.
 - Chain strategy: `stacked-to-main`, selected by the user. No PR or push is requested; this task will produce a local work-unit commit only.
 
 ## Acceptance Criteria
@@ -38,7 +38,7 @@ The project currently stores workflow-shaped request/task states and attempt lim
 - [x] `npm test` (11/11), focused ESLint (no errors/warnings), and `npx tsc --noEmit` pass.
 
 ## Tasks
-- [ ] WF-1 (delegated): Implement agent contracts, persisted workflow loop, POST entry point, and deterministic tests together as one coherent work unit.
+- [x] WF-1 (delegated): Implement agent contracts, persisted workflow loop, POST entry point, and deterministic tests together as one coherent work unit. Commit: `4c3b09b` (`feat(workflow): implement persisted three-agent retries`).
 
 ## Progress and Evidence
 - Exploration found existing `db/schema.sql` request/task/event tables and `lib/llm.ts` Gemini adapter; no workflow code, test runner, or test suite exists.
@@ -58,4 +58,4 @@ The project currently stores workflow-shaped request/task states and attempt lim
 - Independent review caveat: the POST handler awaits every agent call synchronously. With Gemini's existing per-model network retries and fallback, worst-case elapsed time may exceed serverless request-duration limits and leave rows in a running state if the host forcibly terminates execution. A durable async worker/queue is not implemented. The route also has no authentication/rate limiting; do not expose publicly without a gate.
 
 ## Next Step
-Source implementation and final checks are complete for the synchronous technical-test scope. Create the required local work-unit commit using the user-selected `stacked-to-main` chain strategy; then record its commit identity here. No PR or push is requested.
+Source implementation, final checks, and the local work-unit commit are complete for the synchronous technical-test scope. Commit `4c3b09b` records the implementation. No PR or push was created or requested.
