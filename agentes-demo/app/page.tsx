@@ -1,69 +1,187 @@
-import Image from "next/image";
+"use client";
+
+import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
+import { parseWorkflowResponse, WorkflowResponse } from "@/lib/workflow-response";
+
+const agents = [
+  { name: "Orchestrator", description: "Define el plan y los criterios de aceptación." },
+  { name: "Develop", description: "Desarrolla una solución a partir del plan." },
+  { name: "Testing", description: "Evalúa el resultado según los criterios." },
+];
+
+type Theme = "light" | "dark";
+
+function getThemeSnapshot(): Theme {
+  const savedTheme = window.localStorage.getItem("theme");
+  if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function subscribeToTheme(onChange: () => void) {
+  const colorPreference = window.matchMedia("(prefers-color-scheme: dark)");
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  colorPreference.addEventListener("change", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    observer.disconnect();
+    colorPreference.removeEventListener("change", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function getServerThemeSnapshot(): Theme {
+  return "light";
+}
 
 export default function Home() {
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerThemeSnapshot);
+  const [prompt, setPrompt] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [outcome, setOutcome] = useState<WorkflowResponse | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  function toggleTheme() {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    window.localStorage.setItem("theme", nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedPrompt = prompt.trim();
+    if (!normalizedPrompt) {
+      setMessage("Escribe una solicitud antes de enviarla.");
+      return;
+    }
+
+    setMessage("");
+    setOutcome(null);
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: normalizedPrompt }),
+      });
+      const body: unknown = await response.json().catch(() => null);
+      const parsed = parseWorkflowResponse(body);
+
+      if (parsed.kind === "outcome") {
+        setOutcome(parsed.outcome);
+      } else {
+        setMessage(parsed.message);
+      }
+    } catch {
+      setMessage("No se pudo conectar con el servicio. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="app-shell">
+      <div className="page-container">
+        <header className="page-header">
+          <div className="brand-mark" aria-hidden="true">3</div>
+          <div className="header-copy">
+            <p className="eyebrow">FLUJO DE IA</p>
+            <h1>Tres agentes. Un resultado claro.</h1>
+            <p className="intro">
+              Envía una tarea y revisa el resultado cuando terminen Orchestrator, Develop y Testing.
+            </p>
+          </div>
+          <button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === "dark"}>
+            {theme === "dark" ? "☀️ Modo claro" : "🌙 Modo oscuro"}
+          </button>
+        </header>
+
+        <section className="workflow-card" aria-labelledby="workflow-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">CÓMO FUNCIONA</p>
+              <h2 id="workflow-heading">Un equipo coordinado, paso a paso</h2>
+            </div>
+          </div>
+          <ol className="agent-flow">
+            {agents.map((agent, index) => (
+              <li className="agent-step" key={agent.name}>
+                <span className="agent-number">0{index + 1}</span>
+                <div>
+                  <h3>{agent.name}</h3>
+                  <p>{agent.description}</p>
+                </div>
+                {index < agents.length - 1 && <span className="step-arrow" aria-hidden="true">→</span>}
+              </li>
+            ))}
+          </ol>
+          <p className="workflow-note">
+            Cada intento funcional sigue este orden. Testing evalúa el resultado de Develop; si detecta un problema, sus observaciones se tienen en cuenta en el siguiente intento.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+        </section>
+
+        <section className="request-card" aria-labelledby="request-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">NUEVA SOLICITUD</p>
+              <h2 id="request-heading">¿En qué debería trabajar el equipo?</h2>
+            </div>
+            <span className="limit-label">Hasta 10.000 caracteres</span>
+          </div>
+          <form onSubmit={handleSubmit}>
+            <label className="visually-hidden" htmlFor="prompt">Describe tu solicitud</label>
+            <textarea
+              id="prompt"
+              name="prompt"
+              rows={5}
+              maxLength={10_000}
+              placeholder="Describe la tarea o el resultado que necesitas…"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              disabled={isSubmitting}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <div className="form-footer">
+              <p className="helper-text">El estado final y el resultado aparecerán cuando termine el flujo síncrono.</p>
+              <button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Procesando…" : "Ejecutar flujo"}
+              </button>
+            </div>
+          </form>
+
+          {isSubmitting && (
+            <p className="notice" role="status">Solicitud en curso. Esta vista se actualizará cuando el flujo devuelva el resultado final.</p>
+          )}
+          {message && <p className="notice notice-error" role="alert">{message}</p>}
+
+          {outcome && (
+            <section className={`outcome outcome-${outcome.status}`} aria-labelledby="outcome-heading" aria-live="polite">
+              <div className="outcome-header">
+                <div>
+                  <p className="eyebrow">FLUJO FINALIZADO</p>
+                  <h2 id="outcome-heading">{outcome.status === "completed" ? "Solicitud completada" : "Solicitud fallida"}</h2>
+                </div>
+                <span className={`status-badge status-${outcome.status}`}>
+                  {outcome.status === "completed" ? "Completada" : "Fallida"} · {outcome.status}
+                </span>
+              </div>
+              {outcome.requestId && <p className="request-id">ID de solicitud: <code>{outcome.requestId}</code></p>}
+              {outcome.attempts !== undefined && (
+                <p className="attempt-count">Intentos funcionales: <strong>{outcome.attempts}</strong></p>
+              )}
+              <div className="result-panel">
+                <h3>{outcome.status === "completed" ? "Resultado" : "Qué ocurrió"}</h3>
+                <p>{outcome.status === "completed" ? outcome.result : outcome.error}</p>
+              </div>
+            </section>
+          )}
+        </section>
+        <footer className="page-footer">Un flujo síncrono con un ciclo acotado de revisión y mejora.</footer>
+      </div>
+    </main>
   );
 }
