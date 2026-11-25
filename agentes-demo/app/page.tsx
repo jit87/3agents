@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import { parseWorkflowResponse, WorkflowResponse } from "@/lib/workflow-response";
 
 const agents = [
@@ -9,11 +9,47 @@ const agents = [
   { name: "Testing", description: "Evalúa el resultado según los criterios." },
 ];
 
+type Theme = "light" | "dark";
+
+function getThemeSnapshot(): Theme {
+  const savedTheme = window.localStorage.getItem("theme");
+  if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function subscribeToTheme(onChange: () => void) {
+  const colorPreference = window.matchMedia("(prefers-color-scheme: dark)");
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  colorPreference.addEventListener("change", onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    observer.disconnect();
+    colorPreference.removeEventListener("change", onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+function getServerThemeSnapshot(): Theme {
+  return "light";
+}
+
 export default function Home() {
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerThemeSnapshot);
   const [prompt, setPrompt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [outcome, setOutcome] = useState<WorkflowResponse | null>(null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  function toggleTheme() {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    window.localStorage.setItem("theme", nextTheme);
+    document.documentElement.dataset.theme = nextTheme;
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,13 +89,16 @@ export default function Home() {
       <div className="page-container">
         <header className="page-header">
           <div className="brand-mark" aria-hidden="true">3</div>
-          <div>
+          <div className="header-copy">
             <p className="eyebrow">FLUJO DE IA</p>
             <h1>Tres agentes. Un resultado claro.</h1>
             <p className="intro">
               Envía una tarea y revisa el resultado cuando terminen Orchestrator, Develop y Testing.
             </p>
           </div>
+          <button className="theme-toggle" type="button" onClick={toggleTheme} aria-pressed={theme === "dark"}>
+            {theme === "dark" ? "☀️ Modo claro" : "🌙 Modo oscuro"}
+          </button>
         </header>
 
         <section className="workflow-card" aria-labelledby="workflow-heading">
