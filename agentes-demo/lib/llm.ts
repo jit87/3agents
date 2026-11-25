@@ -47,11 +47,18 @@ export async function callModel(
 
   for (const model of models) {
     response = await fetchWithRetries(model, messages, json, apiKey);
+    if (response?.status === 429) {
+      console.error("Gemini rate limit reached; moving to the configured fallback model.", { model });
+      continue;
+    }
     if (response) break;
     console.error("Gemini model exhausted retry attempts:", { model });
   }
 
   if (!response) {
+    throw new Error("AI service request failed. Please try again.");
+  }
+  if (!response.ok) {
     throw new Error("AI service request failed. Please try again.");
   }
 
@@ -100,6 +107,7 @@ async function fetchWithRetries(
       });
 
       if (response.ok) return response;
+      if (response.status === 429) return response;
       if (response.status !== 429 && response.status !== 503) {
         let detail = "No error details provided";
         try {

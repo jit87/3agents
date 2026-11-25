@@ -1,75 +1,123 @@
-# Flujo de trabajo con tres agentes
+# Equipo de 3 agentes de IA
 
-Aplicación de prueba técnica que ejecuta, en orden, a **Orchestrator → Develop → Testing** y presenta el resultado final. El flujo es síncrono: la interfaz espera la respuesta de `POST /api/requests`; no hay progreso en tiempo real, polling ni procesamiento en segundo plano.
+Prueba técnica: una aplicación Next.js en la que tres agentes de IA colaboran para resolver una petición. Los agentes son **Orchestrator**, **Develop** y **Testing**. El estado de cada petición, tarea y evento se guarda en base de datos.
 
-## Ejecutar localmente
+- **App publicada:** https://3agents.vercel.app
+- **Usuario y contraseña de prueba:** no hacen falta, la app es pública.
 
-1. Instala las dependencias si todavía no están instaladas:
+## Cómo funciona
 
+Cada intento sigue este ciclo:
+
+1. **Orchestrator** recibe la petición, la divide en tareas y define los criterios de aceptación.
+2. **Develop** recibe ese plan y produce el resultado.
+3. **Testing** evalúa el resultado de Develop frente a la petición y los criterios, y devuelve un veredicto.
+
+Si Testing aprueba, la petición termina como `completed`. Si falla, sus observaciones pasan al siguiente ciclo (Orchestrator → Develop → Testing). El número de intentos está limitado por `tasks.max_attempts` (3 por defecto). Si se agota, la petición termina como `failed`.
+
+Los agentes no se llaman directamente entre sí: se coordinan a través de la base de datos. Cada agente deja su salida y su estado en `tasks`, el siguiente la lee, y cada paso queda registrado en `events`.
+
+### Dos tipos de reintentos
+
+- **Reintentos técnicos** (cliente Gemini): ante errores de red o respuestas 503, el cliente reintenta con esperas de 1, 3 y 7 segundos y puede recurrir al modelo de `GEMINI_FALLBACK_MODEL`.
+- **Reintentos funcionales** (equipo de agentes): el ciclo Develop → Testing cuando Testing detecta un fallo.
+
+Los primeros no cuentan como intentos funcionales y los errores del proveedor no se tratan como un fallo de Testing.
+
+## Stack
+
+- Next.js (App Router, TypeScript)
+- Neon (Postgres gratuito)
+- Gemini API, a través de su endpoint compatible con el formato OpenAI
+- Vercel (plan gratuito)
+
+## Ejecutar en local
+
+La aplicación está en la subcarpeta `agentes-demo`.
+
+1. Instala las dependencias:
    ```bash
+   cd agentes-demo
    npm install
    ```
-
-2. Configura en `.env.local` las credenciales existentes de Gemini y Neon. **No compartas ese archivo ni subas sus valores al repositorio.**
-3. Inicia Next.js:
-
+2. Crea tu archivo de variables a partir del ejemplo y rellénalo (ver la sección siguiente):
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Crea las tablas ejecutando el contenido de `db/schema.sql` en el editor SQL de Neon.
+4. Arranca la app:
    ```bash
    npm run dev
    ```
+5. Abre http://localhost:3000, escribe una petición y ejecuta el flujo.
 
-4. Abre [http://localhost:3000](http://localhost:3000), escribe una solicitud y selecciona **Ejecutar flujo**. Al finalizar, la página muestra el estado, el resultado o error y los intentos funcionales realizados. Si el puerto 3000 está ocupado, usa el puerto que indique Next.js.
+## Variables de entorno
 
-## Cómo colaboran los agentes
+Solo se listan los nombres. Los valores van en `.env.local` (ignorado por Git) y, en producción, en las variables de entorno de Vercel. **No subas claves al repositorio.**
 
-Cada intento funcional sigue este ciclo:
-
-1. **Orchestrator** prepara un plan y criterios de aceptación.
-2. **Develop** recibe ese plan y produce el resultado.
-3. **Testing** evalúa el resultado frente a la solicitud y los criterios.
-
-Si Testing falla, sus observaciones se pasan al siguiente ciclo. El máximo común se calcula con el menor valor persistido de `tasks.max_attempts` para los tres roles; al aprobar, la solicitud termina como `completed`, y al agotar intentos, como `failed`. Los estados y resultados se persisten.
-
-Los reintentos técnicos del cliente Gemini son distintos: ante errores de red o respuestas 429/503, el cliente reintenta con esperas de 1, 3 y 7 segundos y después puede recurrir al modelo indicado por `GEMINI_FALLBACK_MODEL`. Esos reintentos no aumentan los intentos funcionales de Testing. Los detalles técnicos van al log; la respuesta al usuario es genérica.
-
-## Cómo se usó Codex
-
-Codex se usó para explorar el código existente, implementar cambios acotados y ejecutar verificaciones. Las decisiones de alcance y aceptación fueron humanas.
-
-### Lo que pediste
-
-- Investigar el 405 de `/api/llm-test`: la ruta es POST-only porque ejecuta llamadas a Gemini y no existía una llamada de frontend que corregir; no añadir GET como parche.
-- Separar los reintentos técnicos de Gemini del bucle funcional Orchestrator → Develop → Testing.
-- Implementar los tres agentes con handoffs reales, feedback entre intentos, límite persistido y estados terminales, reutilizando el esquema existente.
-- Mantener el procesamiento síncrono y mostrar en la UI el estado final, el resultado y los intentos, sin polling ni endpoints de consulta nuevos.
-- Corregir la compilación manteniendo `cacheComponents` habilitado.
-
-### Qué pediste y qué revisaste tú
-
-- Revisaste el alcance contra la prueba técnica y pediste que Orchestrator, Develop y Testing fueran agentes diferenciados, con feedback real entre intentos y un máximo persistido.
-- Confirmaste que el flujo síncrono es suficiente; no autorizaste colas, reanudación, polling ni progreso en vivo.
-- Definiste los casos que Codex debía verificar: aprobación inicial, reintento, fallos consecutivos, agotamiento del máximo y estados finales.
-- Pediste separar los reintentos técnicos de Gemini de los fallos funcionales de Testing y proteger las claves.
-- Solicitaste comentarios breves solo para explicar contratos y decisiones no evidentes, y que la interfaz estuviera en español.
-- Pediste una revisión final de coherencia y que se repitieran las verificaciones automatizadas; sus resultados están resumidos abajo.
-
-Esto documenta las decisiones y el alcance que revisaste en la conversación, por separado de las comprobaciones ejecutadas por Codex. **No afirma una revisión línea por línea ni que hayas ejecutado personalmente todos los checks.** La prueba manual completa en el navegador sigue pendiente y puedes hacerla con los pasos anteriores.
-
-## Verificación automatizada
-
-En las últimas verificaciones registradas:
-
-| Comando o comprobación | Resultado |
+| Variable | Uso |
 | --- | --- |
-| `npm test` | 14/14 pruebas aprobadas; cubre handoffs, reintentos y agotamiento con dependencias simuladas, contratos Gemini de texto/JSON y presentación de respuestas exitosas y fallidas. |
-| `npm run lint` | Aprobado. |
-| `npx tsc --noEmit` | Aprobado. |
-| `npm run build` | Aprobado tras eliminar el `runtime` explícito incompatible con Cache Components. |
-| `POST /api/requests` con `{}` | Respondió 400 con el error de validación esperado; no llamó a Gemini ni escribió en Neon. |
+| `DATABASE_URL` | Cadena de conexión a Neon. |
+| `GEMINI_API_KEY` | Clave de la API de Gemini. |
+| `GEMINI_MODEL` | Modelo principal (opcional; hay un valor por defecto en el código). |
+| `GEMINI_FALLBACK_MODEL` | Modelo alternativo si el principal falla (opcional). |
+| `DAILY_REQUEST_LIMIT` | Tope de peticiones por día (opcional). |
 
-Las pruebas automatizadas no ejecutan los tres agentes reales contra Gemini y Neon. La comprobación de la ruta con una solicitud válida queda para la prueba manual local.
+## Despliegue
 
-## Estado y límites conocidos
+- Proyecto en Vercel conectado al repositorio de GitHub, con **Root Directory** `agentes-demo`.
+- Base de datos Neon creada desde la integración de Vercel, que inyecta `DATABASE_URL`.
+- El resto de variables se añaden en **Settings → Environment Variables** de Vercel.
 
-- El endpoint de solicitudes no implementa autenticación ni límite de uso; protégelo antes de exponerlo públicamente.
-- No se ha confirmado un despliegue actual en Vercel. Los commits de este trabajo quedaron locales; no se hizo push ni despliegue.
-- `.env.local` contiene configuración privada y no debe añadirse al repositorio.
+## Pruebas
+
+```bash
+npm test
+```
+
+Usan `node:test` sin dependencias adicionales y dobles de prueba: **no llaman a Gemini ni a Neon**. Cubren aprobación a la primera, reintento tras un fallo, fallos consecutivos, agotamiento del máximo de intentos y los dos estados finales. También cubren que las llamadas a Gemini (texto y JSON) mantienen su formato.
+
+Última ejecución registrada:
+
+| Comprobación | Resultado |
+| --- | --- |
+| `npm test` | 14/14 aprobadas |
+| `npm run lint` | Aprobado |
+| `npx tsc --noEmit` | Aprobado |
+| `npm run build` | Aprobado |
+
+## Cómo usé Codex
+
+**Herramienta.** Programé la parte de agentes con **Codex** (línea de comandos), que tengo configurado con **gentle-ai** (memoria persistente Engram y hooks de sesión).
+
+**Lo que preparé yo antes de usar Codex**, con ayuda de otro asistente de IA en un chat:
+- Crear la app Next.js y desplegarla en Vercel.
+- Crear la base de datos en Neon y conectarla al proyecto.
+- La conexión inicial a la base de datos (`lib/db.ts`) y una ruta de comprobación (`/api/health`).
+
+**Lo que escribió Codex:**
+- La llamada a Gemini (`lib/llm.ts`) con reintentos técnicos y modelo alternativo.
+- El esquema de base de datos (`db/schema.sql`).
+- El flujo de los tres agentes, el endpoint `POST /api/requests` y las pruebas.
+- La interfaz que muestra el estado de cada agente.
+
+**Lo que pedí y decidí yo:**
+- Que los tres agentes fueran funcionales y se comunicaran, y no tres módulos independientes.
+- Reutilizar el esquema de estados e intentos existente, sin crear otro sistema paralelo.
+- Separar los reintentos técnicos de Gemini del bucle funcional Develop → Testing.
+- Los casos de prueba que debían cubrirse y que se comprobara que las llamadas a Gemini seguían funcionando.
+- Que Codex no leyera ni mostrara claves, y que las pruebas no llamaran a Gemini.
+- Cambiar de proveedor: empecé por Groq, pero no pude acceder a su consola, así que usé Gemini.
+
+**Lo que revisé yo:**
+- Los archivos que generó Codex, en especial `lib/llm.ts` y el esquema.
+- Que las claves no estuvieran en el repositorio ni en su historial (`git grep` y `git log -S`).
+
+## Decisiones y límites conocidos
+
+- **Interpretación de la prueba.** El enunciado no dice si los agentes deben usar un modelo real. Interpreté que sí (pide claves de API y planes gratuitos) y usé Gemini. No consulté este punto con vosotros.
+- **Los agentes producen y evalúan texto.** Develop devuelve un resultado en texto estructurado y Testing lo evalúa con el modelo frente a los criterios. No se ejecuta código real.
+- **Flujo síncrono.** La interfaz espera a que termine el flujo. No hay colas ni procesamiento en segundo plano, y un flujo largo podría acercarse al tiempo máximo de las funciones de Vercel.
+- **Cupo gratuito de Gemini.** Es limitado y a veces responde con saturación (503) o límite de uso (429). Si ocurre, la petición queda como `failed` con un mensaje en la interfaz.
+- **Sin autenticación.** La app es pública. El tope diario, si está activo, limita el gasto del cupo gratuito.
+- **Pruebas con dobles.** Las pruebas automáticas no ejercitan Gemini ni Neon reales; el flujo completo se comprobó a mano.

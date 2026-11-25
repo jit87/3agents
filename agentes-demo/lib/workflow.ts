@@ -9,6 +9,7 @@ import {
   type WorkflowStore,
   type TestVerdict,
 } from "@/lib/workflow-core";
+import { buildAttemptHistory } from "@/lib/workflow-response";
 
 type TaskRow = {
   id: string;
@@ -94,7 +95,15 @@ const agents: WorkflowAgents = {
 };
 
 export function createWorkflow(prompt: string) {
-  return runWorkflow(prompt, { store, agents });
+  return runWorkflow(prompt, { store, agents }).then(async (result) => {
+    const rows = await sql`
+      SELECT e.event_type, e.actor, e.details, t.status AS task_status
+      FROM events e LEFT JOIN tasks t ON t.id = e.task_id
+      WHERE e.request_id = ${result.requestId}
+      ORDER BY e.id ASC
+    `;
+    return { ...result, history: buildAttemptHistory(rows as Array<Record<string, unknown>>) };
+  });
 }
 
 function toAgentTask(row: TaskRow) {

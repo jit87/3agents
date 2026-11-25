@@ -67,7 +67,7 @@ export async function runWorkflow(
       await store.setRequestStatus(request.id, "orchestrating");
       const orchestratorInput = { prompt, previousFeedback };
       activeTask = taskSet.orchestrator;
-      await startTask(store, request.id, activeTask, orchestratorInput);
+      await startTask(store, request.id, activeTask, orchestratorInput, attempts);
       const plan = await agents.orchestrator(orchestratorInput);
       await store.finishTask(activeTask.id, plan);
       activeTask = undefined;
@@ -77,7 +77,7 @@ export async function runWorkflow(
       // Develop receives the Orchestrator's plan and the last Testing feedback to revise rejected work.
       const developInput = { ...plan, prompt, previousFeedback };
       activeTask = taskSet.develop;
-      await startTask(store, request.id, activeTask, developInput);
+      await startTask(store, request.id, activeTask, developInput, attempts);
       const development = await agents.develop(developInput);
       latestResult = development.result;
       await store.finishTask(activeTask.id, development);
@@ -88,7 +88,7 @@ export async function runWorkflow(
       // Testing evaluates Develop's result against the original request and Orchestrator criteria.
       const testingInput = { prompt, development, acceptanceCriteria: plan.acceptanceCriteria };
       activeTask = taskSet.testing;
-      await startTask(store, request.id, activeTask, testingInput);
+      await startTask(store, request.id, activeTask, testingInput, attempts);
       const verdict = await agents.testing(testingInput);
       if (verdict.passed) await store.finishTask(activeTask.id, verdict);
       else await store.failTask(activeTask.id, verdict.feedback || "Testing did not pass.", verdict);
@@ -138,9 +138,9 @@ export async function runWorkflow(
   }
 }
 
-async function startTask(store: WorkflowStore, requestId: string, task: AgentTask, input: unknown) {
+async function startTask(store: WorkflowStore, requestId: string, task: AgentTask, input: unknown, attempt: number) {
   if (!(await store.beginTaskAttempt(task.id, input))) {
     throw new Error(`Task ${task.agent} has exhausted its persisted attempt limit.`);
   }
-  await store.addEvent({ requestId, taskId: task.id, actor: task.agent, eventType: "agent.started", details: { input } });
+  await store.addEvent({ requestId, taskId: task.id, actor: task.agent, eventType: "agent.started", details: { attempt, input } });
 }
