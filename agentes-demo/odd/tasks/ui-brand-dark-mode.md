@@ -39,8 +39,9 @@ The browser tab still uses the starter favicon, and the development indicator ca
 - The starter `app/favicon.ico` was removed; `app/page.tsx` already uses the app's three-agent wordmark, so the edge logo was the Next.js dev indicator.
 - Next.js 16.4 documentation confirms `app/icon.svg` can provide a custom icon and `devIndicators: false` hides the development indicator without suppressing compile/runtime errors.
 - Verification: `npm test` passed (14/14); `npm run lint`, `npx tsc --noEmit`, `npm run build`, and `git diff --check` passed. The independent verification run found no obvious UI or workflow regression.
+- Work-unit commit: `b2326ad` (`feat(ui): remove Next branding and add dark mode`).
 - The sandbox denied the first test invocation before execution; the same command was rerun with approval and passed. `git diff --check` emitted only expected LF-to-CRLF warnings.
 - No browser-based visual smoke test was completed; production build and structural UI review passed.
 
 ## Next Step
-Create a local work-unit commit after the verified changes and task record are reviewed. No push or PR is requested.
+Complete. No push or PR was requested.
