@@ -175,7 +175,11 @@ export default function Home() {
               )}
               <div className="result-panel">
                 <h3>{outcome.status === "completed" ? "Resultado" : "Qué ocurrió"}</h3>
-                <p>{outcome.status === "completed" ? outcome.result : outcome.error}</p>
+                {outcome.status === "completed" ? (
+                  <pre className="code-block">{outcome.result}</pre>
+                ) : (
+                  <p>{outcome.error}</p>
+                )}
               </div>
               {outcome.history && outcome.history.length > 0 && (
                 <div className="attempt-history">
@@ -185,9 +189,13 @@ export default function Home() {
                       <h4>Intento {attempt.attempt}</h4>
                       <ul>
                         {attempt.agents.map((agent) => (
-                          <li key={agent.role}>
-                            <strong>{agent.role === "orchestrator" ? "Orchestrator" : agent.role === "develop" ? "Develop" : "Testing"}</strong>
-                            <span>{agent.status === "completed" ? "Completado" : agent.status === "failed" ? "Fallido" : "En curso"}</span>
+                          <li key={agent.role} className="agent-result">
+                            <div className="agent-result-header">
+                              <strong>{agent.role === "orchestrator" ? "Orchestrator" : agent.role === "develop" ? "Develop" : "Testing"}</strong>
+                              <span className={`agent-badge agent-badge-${agent.status}`}>
+                                {agent.status === "completed" ? "Completado" : agent.status === "failed" ? "Fallido" : "En curso"}
+                              </span>
+                            </div>
                             <p>{agent.summary}</p>
                           </li>
                         ))}
